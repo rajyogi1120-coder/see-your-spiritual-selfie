@@ -1,0 +1,1 @@
+Upload this folder (or ZIP) to Netlify. Camera access requires HTTPS. Tap Start Camera and allow camera permission.
