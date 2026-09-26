@@ -7,10 +7,10 @@
 <style>
 :root{color-scheme:light}
 *{box-sizing:border-box}
-body{margin:0;background:#fffaf2;color:#2b2047;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body{margin:0;background:radial-gradient(circle at 50% 12%,#ffffff 0%,#f1f3f6 38%,#c5c9d2 100%);color:#2b2047;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 main{max-width:760px;margin:auto;padding:22px 16px 34px;text-align:center}
-.soul{width:74px;height:74px;margin:4px auto 14px;border-radius:50%;display:grid;place-items:center;background:#fff;box-shadow:0 0 30px #ffd45d}
-.soul:before{content:"";width:24px;height:24px;border-radius:50%;border:8px solid #ffd76a;box-shadow:0 0 20px #ffcf4a}
+.soul{width:74px;height:74px;margin:4px auto 14px;border-radius:50%;display:grid;place-items:center;background:#fff;box-shadow:0 0 30px #e3e7ef}
+.soul:before{content:"";width:24px;height:24px;border-radius:50%;border:8px solid #e5e9f2;box-shadow:0 0 20px #d5dbe8}
 h1{font-size:40px;margin:0 0 6px}.sub{font-size:20px;color:#756985;margin:0 0 22px}
 .stage{position:relative;width:100%;aspect-ratio:3/4;border-radius:30px;overflow:hidden;background:#151515}
 video,canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
@@ -55,7 +55,7 @@ const video=document.getElementById("video"), canvas=document.getElementById("ov
 ctx=canvas.getContext("2d"), toggle=document.getElementById("toggle"),
 statusEl=document.getElementById("status"), cameraState=document.getElementById("cameraState");
 let stream=null, landmarker=null, running=false, lastVideoTime=-1;
-let smoothX=null,smoothY=null;
+let smoothX=null,smoothY=null,spin=0;
 
 const virtues=[
  ["PURITY","#ff9f1c",-90],["PEACE","#2589e8",-63],["HAPPINESS","#ffd22e",-30],
@@ -94,22 +94,34 @@ function videoPoint(lm,w,h){
 }
 function drawRays(x,y,w,h){
  ctx.save();
- const len=Math.min(w,h)*.34, start=12;
+ // slowly rotate the seven virtue rays around the forehead light
+ spin=(performance.now()/1000)*0.24;
+ const len=Math.min(w,h)*.34, start=10;
+ ctx.translate(x,y); ctx.rotate(spin);
  virtues.forEach(([name,color,deg])=>{
-   const a=deg*Math.PI/180, ex=x+Math.cos(a)*len, ey=y+Math.sin(a)*len;
-   const g=ctx.createLinearGradient(x,y,ex,ey); g.addColorStop(0,color+"e8"); g.addColorStop(1,color+"a8");
-   ctx.strokeStyle=g;ctx.lineWidth=10;ctx.lineCap="round";
-   ctx.beginPath();ctx.moveTo(x+Math.cos(a)*start,y+Math.sin(a)*start);ctx.lineTo(ex,ey);ctx.stroke();
-   ctx.font="800 14px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif";
-   ctx.textAlign="center";ctx.textBaseline="middle";ctx.lineWidth=4;ctx.strokeStyle="white";
-   const tx=x+Math.cos(a)*(len+18),ty=y+Math.sin(a)*(len+18);
-   ctx.strokeText(name,tx,ty);ctx.fillStyle=color;ctx.fillText(name,tx,ty);
+   const a=deg*Math.PI/180, ex=Math.cos(a)*len, ey=Math.sin(a)*len;
+   const g=ctx.createLinearGradient(0,0,ex,ey); g.addColorStop(0,color+"85"); g.addColorStop(.40,color+"64"); g.addColorStop(1,color+"ad");
+   ctx.strokeStyle=g;ctx.lineWidth=1.25;ctx.lineCap="round";
+   ctx.shadowColor=color;ctx.shadowBlur=3;
+   ctx.beginPath();ctx.moveTo(Math.cos(a)*start,Math.sin(a)*start);ctx.lineTo(ex,ey);ctx.stroke();
+   ctx.shadowBlur=0;
+   ctx.save();
+   const tx=Math.cos(a)*(len+24),ty=Math.sin(a)*(len+24);
+   ctx.translate(tx,ty); ctx.rotate(-spin); // keep words readable while rays spin
+   ctx.font="700 12px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif";
+   ctx.textAlign="center";ctx.textBaseline="middle";ctx.lineWidth=2.5;ctx.strokeStyle="rgba(255,255,255,.82)";
+   ctx.strokeText(name,0,0);ctx.fillStyle=color;ctx.fillText(name,0,0);
+   ctx.restore();
  });
- // bright point of light, not a star shape
- const glow=ctx.createRadialGradient(x,y,1,x,y,30);
- glow.addColorStop(0,"#fff");glow.addColorStop(.18,"#fff");glow.addColorStop(.38,"#ffd54a");glow.addColorStop(1,"rgba(255,196,0,0)");
- ctx.fillStyle=glow;ctx.beginPath();ctx.arc(x,y,30,0,Math.PI*2);ctx.fill();
- ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(x,y,7,0,Math.PI*2);ctx.fill();
+ ctx.restore();
+ // radiant center stays locked to the detected forehead
+ ctx.save();
+ const pulse=1+0.10*Math.sin(performance.now()/170);
+ const glow=ctx.createRadialGradient(x,y,1,x,y,23*pulse);
+ glow.addColorStop(0,"#fff");glow.addColorStop(.20,"#fffef0");glow.addColorStop(.52,"rgba(255,247,193,.52)");glow.addColorStop(1,"rgba(255,247,193,0)");
+ ctx.fillStyle=glow;ctx.beginPath();ctx.arc(x,y,23*pulse,0,Math.PI*2);ctx.fill();
+ ctx.translate(x,y); // clean point of light, without yellow radial spokes
+ ctx.fillStyle="#fff";ctx.shadowColor="#fff5a0";ctx.shadowBlur=18;ctx.beginPath();ctx.arc(0,0,5.5,0,Math.PI*2);ctx.fill();
  ctx.restore();
 }
 async function loop(){
