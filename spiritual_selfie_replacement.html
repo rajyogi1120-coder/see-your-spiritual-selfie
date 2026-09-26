@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>See Your Spiritual Selfie</title>
+<style>
+*{box-sizing:border-box}body{margin:0;color:#583e69;font-family:Georgia,serif;text-align:center;background:radial-gradient(ellipse at 50% 35%,#fff9dd 0%,#ffe5a5 36%,#e7b8dc 75%,#b1c6ed 100%);min-height:100svh}main{max-width:650px;margin:auto;padding:18px 12px 34px}h1{font-size:clamp(27px,7vw,39px);margin:12px 0 6px;color:#58358a}p{margin:5px 0 15px}.stage{position:relative;width:100%;aspect-ratio:3/4;border-radius:24px;overflow:hidden;background:radial-gradient(circle at 50% 40%,#fff8d7,#f6dca9 50%,#bd9ccf);box-shadow:0 8px 35px #815e9d5c;border:2px solid #ffffffa8}video,canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}canvas{pointer-events:none}.stage:before{content:"";position:absolute;inset:0;pointer-events:none;z-index:1;background:linear-gradient(0deg,#ffc76455,transparent 32%,#fff5db22)}button{margin:15px 5px 8px;padding:13px 25px;border:0;border-radius:28px;color:white;background:#7951b4;font-weight:bold;font-size:17px;cursor:pointer}button:disabled{opacity:.55}#status{font:14px system-ui,sans-serif;min-height:40px;padding:8px;color:#493a60}.note{font:12px system-ui,sans-serif;opacity:.85}
+</style></head><body><main><h1>See Your Spiritual Selfie</h1><p>Discover your seven original virtues</p><div class="stage" id="stage"><video id="video" autoplay muted playsinline></video><canvas id="overlay"></canvas></div><button id="start">Start Camera</button><button id="stop" hidden>Stop Camera</button><div id="status">Tap Start Camera and allow access.</div><div class="note">For best results, face the camera with your forehead visible. Requires HTTPS.</div></main>
+<script>
+const virtues=[['Knowledge','#7655eb'],['Purity','#ff8a19'],['Peace','#258cff'],['Happiness','#ffca0b'],['Love','#35c743'],['Power','#f33e46'],['Bliss','#ca50df']];
+const video=document.querySelector('#video'),canvas=document.querySelector('#overlay'),ctx=canvas.getContext('2d'),stage=document.querySelector('#stage'),start=document.querySelector('#start'),stop=document.querySelector('#stop'),status=document.querySelector('#status');
+let detector=null,stream=null,running=false,lastTime=-1,face=null,lastSeen=0,raf=0;
+let visionBase='';
+async function loadVision(){
+ const sources=[
+  ['https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm','https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'],
+  ['https://esm.sh/@mediapipe/tasks-vision@0.10.14','https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'],
+  ['https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.js','https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm']
+ ];
+ let failures=[];
+ for(const [url,wasm] of sources){
+  try{
+   say('Loading face detection ('+(failures.length+1)+'/3)…');
+   let lib;
+   if(url.endsWith('vision_bundle.js')){
+    await new Promise((resolve,reject)=>{const el=document.createElement('script');el.src=url;el.onload=resolve;el.onerror=()=>reject(Error('Script download failed'));document.head.appendChild(el)});
+    lib=window.vision;
+   }else lib=await import(url);
+   if(lib?.FaceLandmarker&&lib?.FilesetResolver){visionBase=wasm;return lib}
+   throw Error('Face detection exports missing');
+  }catch(e){failures.push(e.message||String(e));console.warn('Face detection source failed',url,e)}
+ }
+ throw Error('Face detection library blocked or unavailable. '+failures.join('; '));
+}
+const say=s=>status.textContent=s;
+function fit(){let d=Math.min(devicePixelRatio||1,2),r=stage.getBoundingClientRect();canvas.width=Math.round(r.width*d);canvas.height=Math.round(r.height*d);ctx.setTransform(d,0,0,d,0,0)}
+window.addEventListener('resize',fit);fit();
+function project(p,w,h){const vw=video.videoWidth||w,vh=video.videoHeight||h,scale=Math.max(w/vw,h/vh);return {x:p.x*vw*scale+(w-vw*scale)/2,y:p.y*vh*scale+(h-vh*scale)/2}}
+function glow(x,y,r,color){const g=ctx.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,color);g.addColorStop(1,'transparent');ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill()}
+function draw(now){if(!running)return;const w=stage.clientWidth,h=stage.clientHeight;ctx.clearRect(0,0,w,h);
+ if(detector&&video.readyState>=2){try{if(video.currentTime!==lastTime){lastTime=video.currentTime;let result=detector.detectForVideo(video,now);if(result.faceLandmarks?.length){const marks=result.faceLandmarks[0];const forehead=marks[10],betweenEyes=marks[168],left=marks[234],right=marks[454];const a=project(forehead,w,h),b=project(betweenEyes,w,h),l=project(left,w,h),r=project(right,w,h);face={x:a.x*.43+b.x*.57,y:a.y*.43+b.y*.57,width:Math.hypot(r.x-l.x,r.y-l.y)};lastSeen=now;say('Face detected — your seven virtues are shining!')}else if(now-lastSeen>1500){face=null;say('Looking for your face… Keep your forehead visible.')}}}catch(e){say('Face tracking paused. Try restarting the camera.')}}
+ if(face&&now-lastSeen<1200){const {x,y,width}=face;const radius=Math.min(Math.max(width*.75,108),Math.min(w,h)*.37);const rotation=now*.00017;const orb=Math.max(25,Math.min(38,width*.19));
+ // Soft beams from the point of light to each moving virtue.
+ virtues.forEach(([name,color],i)=>{let angle=-Math.PI/2+i*Math.PI*2/7+rotation;let xx=x+Math.cos(angle)*radius,yy=y+Math.sin(angle)*radius;let beam=ctx.createLinearGradient(x,y,xx,yy);beam.addColorStop(0,color+'99');beam.addColorStop(1,color+'00');ctx.save();ctx.strokeStyle=beam;ctx.lineWidth=Math.max(5,width*.042);ctx.shadowBlur=15;ctx.shadowColor=color;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(xx,yy);ctx.stroke();ctx.restore();glow(xx,yy,orb*1.65,color+'65');ctx.save();ctx.shadowBlur=16;ctx.shadowColor=color;ctx.fillStyle=color+'d9';ctx.beginPath();ctx.arc(xx,yy,orb,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#fff9';ctx.lineWidth=1.5;ctx.stroke();ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';ctx.font=`bold ${Math.max(9,Math.min(12,orb*.37))}px Georgia`;ctx.fillText(name,xx,yy);ctx.restore()});
+ // Fine complete circular orbit, turning with the virtues.
+ ctx.save();ctx.strokeStyle='#fff9';ctx.lineWidth=1.1;ctx.setLineDash([3,7]);ctx.beginPath();ctx.arc(x,y,radius,0,Math.PI*2);ctx.stroke();ctx.restore();
+ glow(x,y,Math.max(32,width*.21),'#fff4aaee');ctx.save();ctx.translate(x,y);ctx.rotate(-rotation*1.8);ctx.shadowColor='#fff';ctx.shadowBlur=22;ctx.strokeStyle='#fffce4';ctx.lineWidth=1.8;for(let i=0;i<12;i++){let a=i*Math.PI/6;ctx.beginPath();ctx.moveTo(Math.cos(a)*3,Math.sin(a)*3);ctx.lineTo(Math.cos(a)*(i%3===0?20:12),Math.sin(a)*(i%3===0?20:12));ctx.stroke()}ctx.restore();ctx.save();ctx.shadowColor='#fff';ctx.shadowBlur=23;ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x,y,Math.max(5,width*.032),0,Math.PI*2);ctx.fill();ctx.restore()}
+ raf=requestAnimationFrame(draw)}
+async function begin(){start.disabled=true;say('Opening camera…');try{if(!navigator.mediaDevices?.getUserMedia)throw Error('Camera needs HTTPS and a supported browser.');stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:'user',width:{ideal:960},height:{ideal:1280}}});video.srcObject=stream;await video.play();fit();running=true;start.hidden=true;stop.hidden=false;say('Camera on. Loading face detection…');raf=requestAnimationFrame(draw);
+ // MediaPipe model and runtime are loaded online, not bundled in this HTML.
+ const {FaceLandmarker,FilesetResolver}=await loadVision();say('Loading face detection engine…');
+ const vision=await FilesetResolver.forVisionTasks(visionBase);
+ say('Downloading face model…');
+ const opts={baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',delegate:'CPU'},runningMode:'VIDEO',numFaces:1};
+ detector=await FaceLandmarker.createFromOptions(vision,opts);
+ say('Ready! Look toward the camera.')}catch(e){say('Face detection error: '+(e.message||String(e))+'. Check internet or disable content blockers for this page.');if(running){running=false;cancelAnimationFrame(raf);stream?.getTracks().forEach(t=>t.stop());stream=null;video.srcObject=null;start.hidden=false;stop.hidden=true}start.disabled=false}}
+function end(){running=false;cancelAnimationFrame(raf);stream?.getTracks().forEach(t=>t.stop());stream=null;video.srcObject=null;face=null;ctx.clearRect(0,0,canvas.width,canvas.height);start.hidden=false;start.disabled=false;stop.hidden=true;say('Camera stopped.')}start.addEventListener('click',begin);stop.addEventListener('click',end);window.addEventListener('pagehide',()=>stream?.getTracks().forEach(t=>t.stop()));
+</script></body></html>
