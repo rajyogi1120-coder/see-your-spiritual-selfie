@@ -2,7 +2,8 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>See Your Spiritual Selfie</title>
 <style>
 *{box-sizing:border-box}body{margin:0;color:#583e69;font-family:Georgia,serif;text-align:center;background:radial-gradient(ellipse at 50% 35%,#fff9dd 0%,#ffe5a5 36%,#e7b8dc 75%,#b1c6ed 100%);min-height:100svh}main{max-width:650px;margin:auto;padding:18px 12px 34px}h1{font-size:clamp(27px,7vw,39px);margin:12px 0 6px;color:#58358a}p{margin:5px 0 15px}.stage{position:relative;width:100%;aspect-ratio:3/4;border-radius:24px;overflow:hidden;background:radial-gradient(circle at 50% 40%,#fff8d7,#f6dca9 50%,#bd9ccf);box-shadow:0 8px 35px #815e9d5c;border:2px solid #ffffffa8}video,canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}canvas{pointer-events:none}.stage:before{content:"";position:absolute;inset:0;pointer-events:none;z-index:1;background:linear-gradient(0deg,#ffc76455,transparent 32%,#fff5db22)}button{margin:15px 5px 8px;padding:13px 25px;border:0;border-radius:28px;color:white;background:#7951b4;font-weight:bold;font-size:17px;cursor:pointer}button:disabled{opacity:.55}#status{font:14px system-ui,sans-serif;min-height:40px;padding:8px;color:#493a60}.note{font:12px system-ui,sans-serif;opacity:.85}
-</style></head><body><main><h1>See Your Spiritual Selfie</h1><p>Discover your seven original virtues</p><div class="stage" id="stage"><video id="video" autoplay muted playsinline></video><canvas id="overlay"></canvas></div><button id="start">Start Camera</button><button id="stop" hidden>Stop Camera</button><div id="status">Tap Start Camera and allow access.</div><div class="note">For best results, face the camera with your forehead visible. Requires HTTPS.</div></main>
+.virtue-legend{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin:10px 0 14px;font:700 clamp(10px,2.7vw,14px) system-ui,sans-serif}.virtue-legend span{padding:9px 2px;border-radius:12px;background:#ffffffd9;border:1px solid var(--c);color:#4c3766;white-space:nowrap}.virtue-legend i{display:inline-block;width:8px;height:8px;margin-right:4px;border-radius:50%;background:var(--c)}@media(max-width:390px){.virtue-legend{grid-template-columns:repeat(3,minmax(0,1fr))}}
+</style></head><body><main><h1>See Your Spiritual Selfie</h1><p>Discover your seven original virtues</p><div class="virtue-legend" aria-label="The seven virtues"><span style="--c:#7655eb"><i></i>Knowledge</span><span style="--c:#ff8a19"><i></i>Purity</span><span style="--c:#258cff"><i></i>Peace</span><span style="--c:#ffca0b"><i></i>Happiness</span><span style="--c:#35c743"><i></i>Love</span><span style="--c:#f33e46"><i></i>Power</span><span style="--c:#ca50df"><i></i>Bliss</span></div><div class="stage" id="stage"><video id="video" autoplay muted playsinline></video><canvas id="overlay"></canvas></div><button id="start">Start Camera</button><button id="stop" hidden>Stop Camera</button><div id="status">Tap Start Camera and allow access.</div><div class="note">For best results, face the camera with your forehead visible. Requires HTTPS.</div></main>
 <script>
 const virtues=[['Knowledge','#7655eb'],['Purity','#ff8a19'],['Peace','#258cff'],['Happiness','#ffca0b'],['Love','#35c743'],['Power','#f33e46'],['Bliss','#ca50df']];
 const video=document.querySelector('#video'),canvas=document.querySelector('#overlay'),ctx=canvas.getContext('2d'),stage=document.querySelector('#stage'),start=document.querySelector('#start'),stop=document.querySelector('#stop'),status=document.querySelector('#status');
@@ -51,56 +52,26 @@ function draw(now){
  }catch(e){console.warn(e);say('Face tracking paused. Try restarting the camera.')}}
  if(face&&now-lastSeen<1200){
   const {x,y,width}=face;
-  // Mirrored canvas matches mirrored camera. All labels are counter-mirrored below.
-  // Virtues stay OUTSIDE the facial area, in a crown-like open fan (no circle).
-  const margin=40;
-  const availableTop=Math.max(35,y-24);
-  const topY=Math.max(32,Math.min(y-width*.72,availableTop*.34));
-  const upperY=Math.max(38,Math.min(y-width*.46,availableTop*.60));
-  const sideY=Math.max(45,y-width*.12);
-  // Coordinates in unmirrored canvas: mirrored presentation swaps left and right.
-  const leftX=Math.max(margin,Math.min(x-width*.90,w*.13));
-  const rightX=Math.min(w-margin,Math.max(x+width*.90,w*.87));
-  const midLeft=Math.max(margin,Math.min(x-width*.60,w*.26));
-  const midRight=Math.min(w-margin,Math.max(x+width*.60,w*.74));
-  const spots=[
-   {name:'Knowledge',color:'#7655eb',xx:x,yy:topY},
-   {name:'Purity',color:'#ff8a19',xx:leftX,yy:upperY},
-   {name:'Peace',color:'#258cff',xx:leftX,yy:sideY},
-   {name:'Happiness',color:'#ffca0b',xx:midLeft,yy:upperY},
-   {name:'Love',color:'#35c743',xx:midRight,yy:upperY},
-   {name:'Power',color:'#f33e46',xx:rightX,yy:sideY},
-   {name:'Bliss',color:'#ca50df',xx:rightX,yy:upperY}
-  ];
-  // The rays gently spin and shimmer, but the readable words never orbit over the face.
+  // Equal-length, gently shimmering rays fan UPWARD from the forehead.
+  // Labels live in the separate legend above the camera, never across the face.
   const phase=now*.0018;
-  spots.forEach((p,i)=>{
-   const dx=p.xx-x,dy=p.yy-y;
-   const distance=Math.hypot(dx,dy)||1;
-   const nx=-dy/distance,ny=dx/distance;
-   const shimmer=Math.sin(phase+i*.9)*2.2;
-   const xx=p.xx+nx*shimmer,yy=p.yy+ny*shimmer;
+  const radius=Math.max(22,Math.min(width*.53, y-38, x-30, w-x-30));
+  // Seven evenly spaced directions across the upper half; no circular orbit.
+  virtues.forEach(([name,color],i)=>{
+   const angle=(202+i*(136/6))*Math.PI/180;
+   const xx=x+Math.cos(angle)*radius,yy=y+Math.sin(angle)*radius;
    const beam=ctx.createLinearGradient(x,y,xx,yy);
-   beam.addColorStop(0,p.color+'ee');beam.addColorStop(.65,p.color+'9c');beam.addColorStop(1,p.color+'15');
-   ctx.save();ctx.strokeStyle=beam;ctx.lineWidth=Math.max(2.3,Math.min(5,width*.014));
-   ctx.shadowColor=p.color;ctx.shadowBlur=8;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(xx,yy);ctx.stroke();ctx.restore();
-   // Small, clean starburst and label instead of filled circles or swirls.
-   const glowRadius=Math.max(16,Math.min(24,width*.075));
-   glow(xx,yy,glowRadius*1.6,p.color+'b0');
+   beam.addColorStop(0,color+'f0');beam.addColorStop(.65,color+'a0');beam.addColorStop(1,color+'35');
+   ctx.save();ctx.strokeStyle=beam;ctx.lineWidth=Math.max(2.5,Math.min(5,width*.013));
+   ctx.shadowColor=color;ctx.shadowBlur=8;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(xx,yy);ctx.stroke();ctx.restore();
+   glow(xx,yy,Math.max(11,width*.035),color+'90');
    ctx.save();ctx.translate(xx,yy);ctx.rotate(phase*.28);
-   ctx.strokeStyle='#fff';ctx.lineWidth=1.4;ctx.shadowColor=p.color;ctx.shadowBlur=10;
+   ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.shadowColor=color;ctx.shadowBlur=8;
    for(let j=0;j<8;j++){
-    const angle=j*Math.PI/4;
-    ctx.beginPath();ctx.moveTo(Math.cos(angle)*2,Math.sin(angle)*2);
-    ctx.lineTo(Math.cos(angle)*(j%2===0?11:6),Math.sin(angle)*(j%2===0?11:6));ctx.stroke();
+    const a=j*Math.PI/4;
+    ctx.beginPath();ctx.moveTo(Math.cos(a)*2,Math.sin(a)*2);
+    ctx.lineTo(Math.cos(a)*(j%2===0?10:5),Math.sin(a)*(j%2===0?10:5));ctx.stroke();
    }
-   ctx.restore();
-   const labelY=yy<y-width*.25?yy+18:yy+17;
-   ctx.save();ctx.translate(xx,labelY);ctx.scale(-1,1);
-   ctx.textAlign='center';ctx.textBaseline='middle';
-   ctx.font='bold '+Math.max(10,Math.min(14,w*.030))+'px Georgia';
-   ctx.lineJoin='round';ctx.lineWidth=3;ctx.strokeStyle='#452a62';
-   ctx.strokeText(p.name,0,0);ctx.fillStyle='#fff';ctx.fillText(p.name,0,0);
    ctx.restore();
   });
   // Bright point of light centered on the forehead.
