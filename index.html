@@ -34,15 +34,88 @@ function fit(){let d=Math.min(devicePixelRatio||1,2),r=stage.getBoundingClientRe
 window.addEventListener('resize',fit);fit();
 function project(p,w,h){const vw=video.videoWidth||w,vh=video.videoHeight||h,scale=Math.max(w/vw,h/vh);return {x:p.x*vw*scale+(w-vw*scale)/2,y:p.y*vh*scale+(h-vh*scale)/2}}
 function glow(x,y,r,color){const g=ctx.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,color);g.addColorStop(1,'transparent');ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill()}
-function draw(now){if(!running)return;const w=stage.clientWidth,h=stage.clientHeight;ctx.clearRect(0,0,w,h);
- if(detector&&video.readyState>=2){try{if(video.currentTime!==lastTime){lastTime=video.currentTime;let result=detector.detectForVideo(video,now);if(result.faceLandmarks?.length){const marks=result.faceLandmarks[0];const forehead=marks[10],betweenEyes=marks[168],left=marks[234],right=marks[454];const a=project(forehead,w,h),b=project(betweenEyes,w,h),l=project(left,w,h),r=project(right,w,h);face={x:a.x*.43+b.x*.57,y:a.y*.43+b.y*.57,width:Math.hypot(r.x-l.x,r.y-l.y)};lastSeen=now;say('Face detected — your seven virtues are shining!')}else if(now-lastSeen>1500){face=null;say('Looking for your face… Keep your forehead visible.')}}}catch(e){say('Face tracking paused. Try restarting the camera.')}}
- if(face&&now-lastSeen<1200){const {x,y,width}=face;const radius=Math.min(Math.max(width*.75,108),Math.min(w,h)*.37);const rotation=now*.00017;const orb=Math.max(25,Math.min(38,width*.19));
- // Soft beams from the point of light to each moving virtue.
- virtues.forEach(([name,color],i)=>{let angle=-Math.PI/2+i*Math.PI*2/7+rotation;let xx=x+Math.cos(angle)*radius,yy=y+Math.sin(angle)*radius;let beam=ctx.createLinearGradient(x,y,xx,yy);beam.addColorStop(0,color+'99');beam.addColorStop(1,color+'00');ctx.save();ctx.strokeStyle=beam;ctx.lineWidth=Math.max(5,width*.042);ctx.shadowBlur=15;ctx.shadowColor=color;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(xx,yy);ctx.stroke();ctx.restore();glow(xx,yy,orb*1.65,color+'65');ctx.save();ctx.shadowBlur=16;ctx.shadowColor=color;ctx.fillStyle=color+'d9';ctx.beginPath();ctx.arc(xx,yy,orb,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#fff9';ctx.lineWidth=1.5;ctx.stroke();ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';ctx.font=`bold ${Math.max(9,Math.min(12,orb*.37))}px Georgia`;ctx.save();ctx.translate(xx,yy);ctx.scale(-1,1);ctx.fillText(name,0,0);ctx.restore();ctx.restore()});
- // Fine complete circular orbit, turning with the virtues.
- ctx.save();ctx.strokeStyle='#fff9';ctx.lineWidth=1.1;ctx.setLineDash([3,7]);ctx.beginPath();ctx.arc(x,y,radius,0,Math.PI*2);ctx.stroke();ctx.restore();
- glow(x,y,Math.max(32,width*.21),'#fff4aaee');ctx.save();ctx.translate(x,y);ctx.rotate(-rotation*1.8);ctx.shadowColor='#fff';ctx.shadowBlur=22;ctx.strokeStyle='#fffce4';ctx.lineWidth=1.8;for(let i=0;i<12;i++){let a=i*Math.PI/6;ctx.beginPath();ctx.moveTo(Math.cos(a)*3,Math.sin(a)*3);ctx.lineTo(Math.cos(a)*(i%3===0?20:12),Math.sin(a)*(i%3===0?20:12));ctx.stroke()}ctx.restore();ctx.save();ctx.shadowColor='#fff';ctx.shadowBlur=23;ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x,y,Math.max(5,width*.032),0,Math.PI*2);ctx.fill();ctx.restore()}
- raf=requestAnimationFrame(draw)}
+function draw(now){
+ if(!running)return;
+ const w=stage.clientWidth,h=stage.clientHeight;
+ ctx.clearRect(0,0,w,h);
+ if(detector&&video.readyState>=2){try{
+  if(video.currentTime!==lastTime){lastTime=video.currentTime;
+   const result=detector.detectForVideo(video,now);
+   if(result.faceLandmarks?.length){
+    const marks=result.faceLandmarks[0], forehead=marks[10],betweenEyes=marks[168],left=marks[234],right=marks[454];
+    const a=project(forehead,w,h),b=project(betweenEyes,w,h),l=project(left,w,h),r=project(right,w,h);
+    face={x:a.x*.43+b.x*.57,y:a.y*.43+b.y*.57,width:Math.hypot(r.x-l.x,r.y-l.y)};
+    lastSeen=now;say('Face detected — your seven virtues are shining!');
+   }else if(now-lastSeen>1500){face=null;say('Looking for your face… Keep your forehead visible.')}
+  }
+ }catch(e){console.warn(e);say('Face tracking paused. Try restarting the camera.')}}
+ if(face&&now-lastSeen<1200){
+  const {x,y,width}=face;
+  // Mirrored canvas matches mirrored camera. All labels are counter-mirrored below.
+  // Virtues stay OUTSIDE the facial area, in a crown-like open fan (no circle).
+  const margin=40;
+  const availableTop=Math.max(35,y-24);
+  const topY=Math.max(32,Math.min(y-width*.72,availableTop*.34));
+  const upperY=Math.max(38,Math.min(y-width*.46,availableTop*.60));
+  const sideY=Math.max(45,y-width*.12);
+  // Coordinates in unmirrored canvas: mirrored presentation swaps left and right.
+  const leftX=Math.max(margin,Math.min(x-width*.90,w*.13));
+  const rightX=Math.min(w-margin,Math.max(x+width*.90,w*.87));
+  const midLeft=Math.max(margin,Math.min(x-width*.60,w*.26));
+  const midRight=Math.min(w-margin,Math.max(x+width*.60,w*.74));
+  const spots=[
+   {name:'Knowledge',color:'#7655eb',xx:x,yy:topY},
+   {name:'Purity',color:'#ff8a19',xx:leftX,yy:upperY},
+   {name:'Peace',color:'#258cff',xx:leftX,yy:sideY},
+   {name:'Happiness',color:'#ffca0b',xx:midLeft,yy:upperY},
+   {name:'Love',color:'#35c743',xx:midRight,yy:upperY},
+   {name:'Power',color:'#f33e46',xx:rightX,yy:sideY},
+   {name:'Bliss',color:'#ca50df',xx:rightX,yy:upperY}
+  ];
+  // The rays gently spin and shimmer, but the readable words never orbit over the face.
+  const phase=now*.0018;
+  spots.forEach((p,i)=>{
+   const dx=p.xx-x,dy=p.yy-y;
+   const distance=Math.hypot(dx,dy)||1;
+   const nx=-dy/distance,ny=dx/distance;
+   const shimmer=Math.sin(phase+i*.9)*2.2;
+   const xx=p.xx+nx*shimmer,yy=p.yy+ny*shimmer;
+   const beam=ctx.createLinearGradient(x,y,xx,yy);
+   beam.addColorStop(0,p.color+'ee');beam.addColorStop(.65,p.color+'9c');beam.addColorStop(1,p.color+'15');
+   ctx.save();ctx.strokeStyle=beam;ctx.lineWidth=Math.max(2.3,Math.min(5,width*.014));
+   ctx.shadowColor=p.color;ctx.shadowBlur=8;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(xx,yy);ctx.stroke();ctx.restore();
+   // Small, clean starburst and label instead of filled circles or swirls.
+   const glowRadius=Math.max(16,Math.min(24,width*.075));
+   glow(xx,yy,glowRadius*1.6,p.color+'b0');
+   ctx.save();ctx.translate(xx,yy);ctx.rotate(phase*.28);
+   ctx.strokeStyle='#fff';ctx.lineWidth=1.4;ctx.shadowColor=p.color;ctx.shadowBlur=10;
+   for(let j=0;j<8;j++){
+    const angle=j*Math.PI/4;
+    ctx.beginPath();ctx.moveTo(Math.cos(angle)*2,Math.sin(angle)*2);
+    ctx.lineTo(Math.cos(angle)*(j%2===0?11:6),Math.sin(angle)*(j%2===0?11:6));ctx.stroke();
+   }
+   ctx.restore();
+   const labelY=yy<y-width*.25?yy+18:yy+17;
+   ctx.save();ctx.translate(xx,labelY);ctx.scale(-1,1);
+   ctx.textAlign='center';ctx.textBaseline='middle';
+   ctx.font='bold '+Math.max(10,Math.min(14,w*.030))+'px Georgia';
+   ctx.lineJoin='round';ctx.lineWidth=3;ctx.strokeStyle='#452a62';
+   ctx.strokeText(p.name,0,0);ctx.fillStyle='#fff';ctx.fillText(p.name,0,0);
+   ctx.restore();
+  });
+  // Bright point of light centered on the forehead.
+  glow(x,y,Math.max(25,width*.17),'#fff4aaff');
+  ctx.save();ctx.translate(x,y);ctx.rotate(phase*.38);
+  ctx.shadowColor='#fff8a5';ctx.shadowBlur=20;ctx.strokeStyle='#fff';ctx.lineWidth=1.8;
+  for(let i=0;i<12;i++){
+   const angle=i*Math.PI/6;ctx.beginPath();ctx.moveTo(Math.cos(angle)*3,Math.sin(angle)*3);
+   ctx.lineTo(Math.cos(angle)*(i%3===0?17:10),Math.sin(angle)*(i%3===0?17:10));ctx.stroke();
+  }
+  ctx.restore();ctx.save();ctx.fillStyle='#fff';ctx.shadowColor='#fff';ctx.shadowBlur=15;
+  ctx.beginPath();ctx.arc(x,y,Math.max(4,width*.018),0,Math.PI*2);ctx.fill();ctx.restore();
+ }
+ raf=requestAnimationFrame(draw);
+}
 async function begin(){start.disabled=true;say('Opening camera…');try{if(!navigator.mediaDevices?.getUserMedia)throw Error('Camera needs HTTPS and a supported browser.');stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:'user',width:{ideal:960},height:{ideal:1280}}});video.srcObject=stream;await video.play();fit();running=true;start.hidden=true;stop.hidden=false;say('Camera on. Loading face detection…');raf=requestAnimationFrame(draw);
  // MediaPipe model and runtime are loaded online, not bundled in this HTML.
  const {FaceLandmarker,FilesetResolver}=await loadVision();say('Loading face detection engine…');
